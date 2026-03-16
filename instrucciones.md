@@ -850,3 +850,142 @@ sudo cp flashsystem_collector /usr/local/bin/
 ```
 
 **Conclusión:** El código Go se transforma en un ejecutable binario durante la **instalación**. Zabbix interactúa exclusivamente con ese binario compilado, no con el código fuente.
+
+
+
+
+# Análisis del Cambio en los Imports de discovery.go
+
+## ¿Qué Pasaría con Ese Cambio?
+
+### 1. **Error de Compilación (Escenario Más Probable)**
+
+Si tu archivo `go.mod` tiene definido el módulo como:
+
+```go
+module flashsystem_zabbix
+```
+
+Pero en `discovery.go` usas:
+
+```go
+import (
+    "zabbix_go_ibm_flash_v2/internal/parser"
+    "zabbix_go_ibm_flash_v2/internal/ssh"
+)
+```
+
+**Resultado:** ❌ **El código NO compilará**
+
+**Error que verás:**
+```
+package zabbix_go_ibm_flash_v2/internal/parser is not in GOROOT
+package zabbix_go_ibm_flash_v2/internal/ssh is not in GOROOT
+```
+
+---
+
+### 2. **Por Qué Ocurre Este Error**
+
+En Go, los imports deben coincidir **exactamente** con el nombre del módulo definido en `go.mod`:
+
+| Archivo | Valor Actual | Valor Propuesto | ¿Coincide? |
+|---------|-------------|-----------------|------------|
+| `go.mod` | `module flashsystem_zabbix` | - | - |
+| `discovery.go` | `flashsystem_zabbix/internal/...` | `zabbix_go_ibm_flash_v2/internal/...` | ❌ NO |
+
+---
+
+## Cómo Hacer el Cambio Correctamente
+
+### Opción A: Cambiar Todo a `zabbix_go_ibm_flash_v2` (Recomendado si quieres ese nombre)
+
+**Paso 1:** Actualizar `go.mod`
+```go
+module zabbix_go_ibm_flash_v2
+
+go 1.22
+
+require golang.org/x/crypto v0.22.0
+```
+
+**Paso 2:** Actualizar **todos** los archivos con imports internos
+
+| Archivo | Cambio Requerido |
+|---------|-----------------|
+| `main.go` | `flashsystem_zabbix/internal/...` → `zabbix_go_ibm_flash_v2/internal/...` |
+| `internal/ssh/ssh.go` | `flashsystem_zabbix/internal/...` → `zabbix_go_ibm_flash_v2/internal/...` |
+| `internal/monitor/monitor.go` | `flashsystem_zabbix/internal/...` → `zabbix_go_ibm_flash_v2/internal/...` |
+| `internal/parser/parser.go` | (Sin cambios si no importa otros paquetes internos) |
+| `internal/discovery/discovery.go` | ✅ (El que estás cambiando) |
+| `internal/utils/utils.go` | (Sin cambios si no importa otros paquetes internos) |
+
+**Paso 3:** Limpiar cache y recompilar
+```bash
+go clean -modcache
+go mod tidy
+go build -o flashsystem_collector .
+```
+
+---
+
+### Opción B: Mantener `flashsystem_zabbix` (Menos Cambios)
+
+Si el repositorio se llama `zabbix_go_ibm_flash_v2` pero quieres mantener el módulo como `flashsystem_zabbix`:
+
+**No cambies los imports** - déjalos como:
+```go
+import (
+    "flashsystem_zabbix/internal/parser"
+    "flashsystem_zabbix/internal/ssh"
+)
+```
+
+**Ventaja:** Solo cambias el nombre del repositorio en GitHub, no el código.
+
+---
+
+## Verificación de Archivos Afectados
+
+Basado en la estructura del proyecto, estos archivos necesitarían actualización si cambias el nombre del módulo:
+
+```bash
+# Buscar todos los imports que necesitan cambio
+grep -r "flashsystem_zabbix/internal" . --include="*.go"
+
+# Archivos típicos afectados:
+./main.go
+./internal/ssh/ssh.go
+./internal/monitor/monitor.go
+./internal/discovery/discovery.go
+```
+
+---
+
+## Tabla de Decisión
+
+| Escenario | Acción Requerida | Impacto |
+|-----------|-----------------|---------|
+| Solo cambias `discovery.go` | ❌ No funcionará | Error de compilación |
+| Cambias `go.mod` + todos los imports | ✅ Funcionará | Requiere actualizar ~4-5 archivos |
+| Mantienes nombre actual | ✅ Funcionará | Sin cambios necesarios |
+
+---
+
+## Recomendación
+
+**Si el repositorio en GitHub se llama `zabbix_go_ibm_flash_v2`:**
+
+```bash
+# 1. Actualizar go.mod
+sed -i 's/module flashsystem_zabbix/module zabbix_go_ibm_flash_v2/' go.mod
+
+# 2. Actualizar todos los imports en todo el proyecto
+find . -name "*.go" -type f -exec sed -i 's|flashsystem_zabbix/internal|zabbix_go_ibm_flash_v2/internal|g' {} \;
+
+# 3. Verificar cambios
+go mod tidy
+go build -o flashsystem_collector .
+```
+
+**Importante:** El nombre del módulo **no afecta** la funcionalidad del programa. Solo debe ser consistente en todo el proyecto. Puedes usar cualquiera de los dos nombres, pero **debe coincidir entre `go.mod` y todos los imports**.
