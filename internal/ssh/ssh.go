@@ -152,7 +152,7 @@ func validateCredentials(host, user, pass string) (bool, error) {
 
 	// Intentar ejecutar un comando simple para confirmar que las credenciales funcionan
 	// Usamos lssystem porque es un comando que debería estar disponible en todos los sistemas
-	_, err = executeCommand(client, "svcinfo lssystem -delim :")
+	_, err = ExecuteCommand(client, "svcinfo lssystem -delim :")
 	if err != nil {
 		// Si el comando falla, las credenciales podrían ser válidas pero el usuario
 		// podría no tener permisos para ejecutar el comando específico
@@ -170,7 +170,7 @@ func validateCredentials(host, user, pass string) (bool, error) {
 // Retorna un mapa con información del sistema o un error si falla
 func getConnectionInfo(host, user, pass string) (map[string]string, error) {
 	// Establecer conexión SSH
-	client, err := establishSSHConnection(host, user, pass)
+	client, err := EstablishSSHConnection(host, user, pass)
 	if err != nil {
 		return nil, fmt.Errorf("error al conectar para obtener información: %w", err)
 	}
@@ -182,7 +182,7 @@ func getConnectionInfo(host, user, pass string) (map[string]string, error) {
 	}()
 
 	// Ejecutar comando para obtener información del sistema
-	output, err := executeCommand(client, "svcinfo lssystem -delim :")
+	output, err := ExecuteCommand(client, "svcinfo lssystem -delim :")
 	if err != nil {
 		return nil, fmt.Errorf("error al obtener información del sistema: %w", err)
 	}
