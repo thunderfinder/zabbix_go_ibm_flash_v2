@@ -204,7 +204,7 @@ UserParameter=flashsystem.system.iops[*],/usr/lib/zabbix/externalscripts/flashsy
 ## Estructura del proyecto
 
 ```
-flashsystem_zabbix/
+zabbix_go_ibm_flash_v2/
 ├── go.mod                 # Dependencias del proyecto Go
 ├── main.go                # Punto de entrada principal del programa
 ├── internal/

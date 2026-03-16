@@ -343,7 +343,7 @@ El programa sigue el principio de **"fallar suavemente"**:
 ## 10. Estructura del proyecto
 
 ```
-flashsystem_zabbix/
+zabbix_go_ibm_flash_v2/
 ├── go.mod                          # Dependencias del proyecto
 ├── main.go                         # Punto de entrada principal
 ├── internal/

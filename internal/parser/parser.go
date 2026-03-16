@@ -21,7 +21,7 @@ func ParseDelimitedOutput(output string, delimiter rune) []Record {
 		return nil
 	}
 
- los caracteres de nueva línea para manejar diferentes sistemas
+	// Normalizar los caracteres de nueva línea para manejar diferentes sistemas
 	output = strings.ReplaceAll(output, "\r\n", "\n")
 	output = strings.ReplaceAll(output, "\r", "\n")
 

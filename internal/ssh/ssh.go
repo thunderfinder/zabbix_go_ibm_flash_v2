@@ -5,18 +5,17 @@ package ssh
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 )
 
-// establishSSHConnection crea una nueva conexión SSH al sistema de almacenamiento
+// EstablishSSHConnection crea una nueva conexión SSH al sistema de almacenamiento
 // host: dirección IP o nombre de host del sistema FlashSystem
 // user: nombre de usuario para autenticación
 // pass: contraseña para autenticación
 // Retorna un cliente SSH o un error si falla la conexión
-func establishSSHConnection(host, user, pass string) (*ssh.Client, error) {
+func EstablishSSHConnection(host, user, pass string) (*ssh.Client, error) {
 	// Configurar los parámetros de autenticación SSH
 	config := &ssh.ClientConfig{
 		// Usuario para autenticación
@@ -45,11 +44,11 @@ func establishSSHConnection(host, user, pass string) (*ssh.Client, error) {
 	return conn, nil
 }
 
-// executeCommand ejecuta un comando en el sistema FlashSystem remoto a través de SSH
+// ExecuteCommand ejecuta un comando en el sistema FlashSystem remoto a través de SSH
 // client: cliente SSH ya conectado
 // command: comando SVC a ejecutar en el sistema remoto
 // Retorna la salida del comando o un error si falla la ejecución
-func executeCommand(client *ssh.Client, command string) (string, error) {
+func ExecuteCommand(client *ssh.Client, command string) (string, error) {
 	// Crear una nueva sesión SSH para ejecutar el comando
 	session, err := client.NewSession()
 	if err != nil {
@@ -110,7 +109,7 @@ func executeCommand(client *ssh.Client, command string) (string, error) {
 // Retorna nil si la conexión es exitosa, o un error si falla
 func testConnection(host, user, pass string) error {
 	// Establecer conexión SSH
-	client, err := establishSSHConnection(host, user, pass)
+	client, err := EstablishSSHConnection(host, user, pass)
 	if err != nil {
 		return fmt.Errorf("prueba de conexión fallida: %w", err)
 	}
@@ -122,7 +121,7 @@ func testConnection(host, user, pass string) error {
 	}()
 
 	// Ejecutar un comando simple para verificar que la conexión funcione
-	_, err = executeCommand(client, "svcinfo lssystem -delim :")
+	_, err = ExecuteCommand(client, "svcinfo lssystem -delim :")
 	if err != nil {
 		return fmt.Errorf("prueba de comando fallida: %w", err)
 	}
@@ -139,7 +138,7 @@ func testConnection(host, user, pass string) error {
 // Retorna true si las credenciales son válidas, false en caso contrario
 func validateCredentials(host, user, pass string) (bool, error) {
 	// Establecer conexión SSH
-	client, err := establishSSHConnection(host, user, pass)
+	client, err := EstablishSSHConnection(host, user, pass)
 	if err != nil {
 		// Si falla la conexión, probablemente las credenciales sean incorrectas
 		return false, fmt.Errorf("credenciales inválidas o sistema no accesible: %w", err)
@@ -282,7 +281,7 @@ func trimSpaces(s string) string {
 // c: byte a verificar
 // Retorna true si es un espacio, tabulador u otro carácter de espacio
 func isSpace(c byte) bool {
-	return c == ' ' || c == '\t' || c || c == '\r'
+	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
 // split divide una cadena por un delimitador
@@ -346,6 +345,7 @@ func replaceAll(s, old, new string) string {
 	result := make([]byte, resultLen)
 	
 	j := 0
+	start := 0
 	for i := 0; i <= len(s)-oldLen; i++ {
 		if s[i:i+oldLen] == old {
 			// Copiar la parte antes del match

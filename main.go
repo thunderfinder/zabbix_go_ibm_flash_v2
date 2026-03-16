@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
-	"flashsystem_zabbix/internal/discovery"
-	"flashsystem_zabbix/internal/monitor"
-	"flashsystem_zabbix/internal/parser"
-	"flashsystem_zabbix/internal/ssh"
-	"flashsystem_zabbix/internal/utils"
+	"zabbix_go_ibm_flash_v2/internal/discovery"
+	"zabbix_go_ibm_flash_v2/internal/monitor"
+	"zabbix_go_ibm_flash_v2/internal/ssh"
 )
 
 // init configura el sistema de logging para registrar eventos importantes
@@ -39,10 +38,10 @@ func main() {
 	}
 
 	// Extraer los argumentos de línea de comandos
-	host := os.Args[1]     // Dirección IP o nombre de host del sistema FlashSystem
-	user := os.Args[2]     // Nombre de usuario para autenticación SSH
-	pass := os.Args[3]     // Contraseña para autenticación SSH
-	command := os.Args[4]  // Comando de monitoreo a ejecutar
+	host := os.Args[1]    // Dirección IP o nombre de host del sistema FlashSystem
+	user := os.Args[2]    // Nombre de usuario para autenticación SSH
+	pass := os.Args[3]    // Contraseña para autenticación SSH
+	command := os.Args[4] // Comando de monitoreo a ejecutar
 
 	// Validar que los argumentos no estén vacíos
 	if host == "" {
@@ -419,25 +418,25 @@ func executeGetClusterStatus(host, user, pass string) {
 func runSSHCommandWithRetry(host, user, pass, cmd string) (string, error) {
 	var output string
 	var err error
-	
+
 	// Definir el número máximo de intentos
 	maxRetries := 3
-	
+
 	// Intentar ejecutar el comando hasta maxRetries veces
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		// Registrar intento
 		log.Printf("Intento %d/%d para ejecutar comando: %s", attempt+1, maxRetries, cmd)
-		
+
 		// Ejecutar el comando SSH
 		output, err = runSSHCommand(host, user, pass, cmd)
 		if err == nil {
 			// Si no hubo error, retornar el resultado
 			return output, nil
 		}
-		
+
 		// Registrar error
 		log.Printf("Intento %d fallido: %v", attempt+1, err)
-		
+
 		// Esperar antes de reintentar (excepto en el último intento)
 		if attempt < maxRetries-1 {
 			waitTime := time.Duration(attempt+1) * time.Second
@@ -445,7 +444,7 @@ func runSSHCommandWithRetry(host, user, pass, cmd string) (string, error) {
 			time.Sleep(waitTime)
 		}
 	}
-	
+
 	// Si se agotaron los intentos, retornar el último error
 	return "", fmt.Errorf("comando '%s' falló después de %d intentos: %w", cmd, maxRetries, err)
 }
@@ -508,7 +507,7 @@ func runSSHCommand(host, user, pass, cmd string) (string, error) {
 func parseDelimitedOutput(output string) []map[string]string {
 	// Dividir la salida en líneas
 	lines := strings.Split(strings.TrimSpace(output), "\n")
-	
+
 	// Verificar que haya suficientes líneas (cabecera + datos)
 	if len(lines) < 2 {
 		return nil
@@ -516,7 +515,7 @@ func parseDelimitedOutput(output string) []map[string]string {
 
 	// Extraer la cabecera (primera línea)
 	headers := strings.Split(lines[0], ":")
-	
+
 	// Preparar la lista para almacenar los registros
 	var results []map[string]string
 
@@ -526,13 +525,13 @@ func parseDelimitedOutput(output string) []map[string]string {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		
+
 		// Dividir la línea en valores usando el separador ':'
 		values := strings.Split(line, ":")
-		
+
 		// Crear un mapa para almacenar los pares campo:valor
 		row := make(map[string]string)
-		
+
 		// Asociar cada valor con su respectivo encabezado
 		for i, h := range headers {
 			h = strings.TrimSpace(h) // Limpiar espacios en blanco
@@ -577,8 +576,8 @@ func convertToFloat(str string) (float64, error) {
 		str = strings.TrimSuffix(str, "TB")
 		str = strings.TrimSpace(str)
 	}
-	
-	return fmt.ParseFloat(str, 64)
+
+	return strconv.ParseFloat(str, 64)
 }
 
 // convertToInt convierte una cadena a número entero

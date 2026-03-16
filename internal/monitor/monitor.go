@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"flashsystem_zabbix/internal/parser"
-	"flashsystem_zabbix/internal/ssh"
+	"zabbix_go_ibm_flash_v2/internal/parser"
+	"zabbix_go_ibm_flash_v2/internal/ssh"
 )
 
 // GetDriveStatus obtiene el estado de una unidad específica por enclosure y slot
@@ -388,7 +388,8 @@ func GetNodeStatus(host, user, pass, nodeID string) (string, error) {
 	output, err := ssh.ExecuteCommand(client, cmd)
 	if err != nil {
 		return "0", fmt.Errorf("error ejecutando comando lsnode: %w", err)
-	ar la salida del comando
+	}
+	// Parsear la salida del comando
 	records := parser.ParseDelimitedOutput(output, ':')
 
 	// Buscar el nodo específico en los registros

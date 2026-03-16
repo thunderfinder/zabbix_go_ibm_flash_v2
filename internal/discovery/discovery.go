@@ -8,8 +8,8 @@ import (
 	"log"
 	"strings"
 
-	"flashsystem_zabbix/internal/parser"
-	"flashsystem_zabbix/internal/ssh"
+	"zabbix_go_ibm_flash_v2/internal/parser"
+	"zabbix_go_ibm_flash_v2/internal/ssh"
 )
 
 // DiscoveryItem representa un elemento descubierto por Zabbix
@@ -74,7 +74,7 @@ func DiscoverDrives(host, user, pass string) (string, error) {
 			Status: escapeJSONValue(r["status"]),
 			Type:   escapeJSONValue(r["type"]),
 		}
-		
+
 		// Agregar el elemento a la lista de descubrimiento
 		discoveryItems = append(discoveryItems, item)
 	}
@@ -140,7 +140,7 @@ func DiscoverEnclosures(host, user, pass string) (string, error) {
 			Status: escapeJSONValue(r["status"]),
 			Type:   escapeJSONValue(r["type"]),
 		}
-		
+
 		// Agregar el elemento a la lista de descubrimiento
 		discoveryItems = append(discoveryItems, item)
 	}
@@ -206,7 +206,7 @@ func DiscoverPools(host, user, pass string) (string, error) {
 			Status: escapeJSONValue(r["status"]),
 			Type:   escapeJSONValue(r["type"]),
 		}
-		
+
 		// Agregar el elemento a la lista de descubrimiento
 		discoveryItems = append(discoveryItems, item)
 	}
@@ -272,7 +272,7 @@ func DiscoverVolumes(host, user, pass string) (string, error) {
 			Status: escapeJSONValue(r["status"]),
 			Type:   escapeJSONValue(r["vdisk_type"]),
 		}
-		
+
 		// Agregar el elemento a la lista de descubrimiento
 		discoveryItems = append(discoveryItems, item)
 	}
@@ -338,7 +338,7 @@ func DiscoverNodes(host, user, pass string) (string, error) {
 			Status: escapeJSONValue(r["status"]),
 			Type:   escapeJSONValue(r["type"]),
 		}
-		
+
 		// Agregar el elemento a la lista de descubrimiento
 		discoveryItems = append(discoveryItems, item)
 	}
@@ -404,7 +404,7 @@ func DiscoverFCPorts(host, user, pass string) (string, error) {
 			Status: escapeJSONValue(r["status"]),
 			Type:   escapeJSONValue(r["type"]),
 		}
-		
+
 		// Agregar el elemento a la lista de descubrimiento
 		discoveryItems = append(discoveryItems, item)
 	}
@@ -436,7 +436,7 @@ func escapeJSONValue(value string) string {
 	value = strings.ReplaceAll(value, "\n", `\n`) // Nueva línea
 	value = strings.ReplaceAll(value, "\r", `\r`) // Retorno de carro
 	value = strings.ReplaceAll(value, "\t", `\t`) // Tabulador
-	
+
 	return value
 }
 
@@ -484,7 +484,7 @@ func DiscoverFlashCopyRelationships(host, user, pass string) (string, error) {
 			Status: escapeJSONValue(r["status"]),
 			Type:   escapeJSONValue(r["copy_rate"]),
 		}
-		
+
 		// Agregar el elemento a la lista de descubrimiento
 		discoveryItems = append(discoveryItems, item)
 	}
@@ -550,7 +550,7 @@ func DiscoverReplicationRelationships(host, user, pass string) (string, error) {
 			Status: escapeJSONValue(r["state"]),
 			Type:   escapeJSONValue(r["copy_type"]),
 		}
-		
+
 		// Agregar el elemento a la lista de descubrimiento
 		discoveryItems = append(discoveryItems, item)
 	}
