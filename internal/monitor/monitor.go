@@ -431,7 +431,7 @@ func isValidNumericInput(input string) bool {
 func convertToFloat(str string) (float64, error) {
 	// Eliminar espacios en blanco y unidades comunes
 	str = strings.TrimSpace(str)
-	
+
 	// Remover unidades comunes como 'GB', 'TB', etc. si existen
 	// Este es un ejemplo simplificado, en producción podría ser más complejo
 	if strings.HasSuffix(str, "GB") {
@@ -444,7 +444,7 @@ func convertToFloat(str string) (float64, error) {
 		str = strings.TrimSuffix(str, "MB")
 		str = strings.TrimSpace(str)
 	}
-	
+
 	return strconv.ParseFloat(str, 64)
 }
 
@@ -498,7 +498,7 @@ func GetClusterStatus(host, user, pass string) (string, error) {
 			// Si no hay campo status, asumimos healthy por defecto
 			return "1", nil
 		}
-		
+
 		switch strings.ToLower(status) {
 		case "online", "active", "healthy", "normal", "operational":
 			return "1", nil // Estado OK

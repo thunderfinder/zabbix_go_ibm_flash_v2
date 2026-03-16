@@ -48,7 +48,7 @@ func ParseDelimitedOutput(output string, delimiter rune) []Record {
 	// Procesar cada línea de datos (desde la segunda línea en adelante)
 	for i := 1; i < len(lines); i++ {
 		line := lines[i]
-		
+
 		// Saltar líneas vacías
 		if strings.TrimSpace(line) == "" {
 			continue
@@ -110,12 +110,12 @@ func splitAndTrim(text string, delimiter rune) []string {
 func ParseSystemInfo(output string) Record {
 	// Parsear la salida como si fuera un comando delimitado
 	records := ParseDelimitedOutput(output, ':')
-	
+
 	// Verificar que se haya obtenido al menos un registro
 	if len(records) == 0 {
 		return nil
 	}
-	
+
 	// Retornar el primer (y único) registro de información del sistema
 	return records[0]
 }
@@ -143,7 +143,7 @@ func ParseEnclosureInfo(output string) []Record {
 	return ParseDelimitedOutput(output, ':')
 }
 
-//ierte la salida de lsmdiskgrp en registros de grupos de discos
+// ierte la salida de lsmdiskgrp en registros de grupos de discos
 // output: la salida del comando lsmdiskgrp
 // Retorna una lista de registros con la información de los grupos de discos
 func ParsePoolInfo(output string) []Record {
@@ -197,7 +197,7 @@ func ParsePerformanceInfo(output string) []Record {
 func CleanValue(value string) string {
 	// Eliminar espacios en blanco al principio y al final
 	value = strings.TrimSpace(value)
-	
+
 	// Eliminar caracteres de control que podrían causar problemas
 	var cleaned strings.Builder
 	for _, r := range value {
@@ -205,7 +205,7 @@ func CleanValue(value string) string {
 			cleaned.WriteRune(r)
 		}
 	}
-	
+
 	return cleaned.String()
 }
 
@@ -218,14 +218,14 @@ func IsValidRecord(record Record) bool {
 	if record == nil {
 		return false
 	}
-	
+
 	// Verificar que al menos un campo tenga un valor no vacío
 	for _, value := range record {
 		if value != "" {
 			return true
 		}
 	}
-	
+
 	// Si todos los campos están vacíos, el registro no es válido
 	return false
 }
@@ -235,14 +235,14 @@ func IsValidRecord(record Record) bool {
 // Retorna una nueva lista solo con los registros válidos
 func FilterValidRecords(records []Record) []Record {
 	var validRecords []Record
-	
+
 	// Recorrer cada registro y verificar si es válido
 	for _, record := range records {
 		if IsValidRecord(record) {
 			validRecords = append(validRecords, record)
 		}
 	}
-	
+
 	return validRecords
 }
 
@@ -256,13 +256,13 @@ func GetFieldValue(record Record, fieldName, defaultValue string) string {
 	if record == nil {
 		return defaultValue
 	}
-	
+
 	// Buscar el campo en el registro
 	value, exists := record[fieldName]
 	if !exists {
 		return defaultValue
 	}
-	
+
 	// Retornar el valor encontrado
 	return value
 }
@@ -276,7 +276,7 @@ func HasField(record Record, fieldName string) bool {
 	if record == nil {
 		return false
 	}
-	
+
 	// Verificar si el campo existe en el registro
 	_, exists := record[fieldName]
 	return exists
@@ -290,18 +290,18 @@ func GetUniqueFieldValues(records []Record, fieldName string) []string {
 	// Mapa para almacenar valores únicos
 	uniqueValues := make(map[string]bool)
 	var result []string
-	
+
 	// Recorrer cada registro
 	for _, record := range records {
 		// Obtener el valor del campo
 		value := GetFieldValue(record, fieldName, "")
-		
+
 		// Si el valor no está en el mapa, agregarlo
 		if !uniqueValues[value] {
 			uniqueValues[value] = true
 			result = append(result, value)
 		}
 	}
-	
+
 	return result
 }

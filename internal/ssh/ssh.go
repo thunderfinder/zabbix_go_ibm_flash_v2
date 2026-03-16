@@ -198,7 +198,7 @@ func getConnectionInfo(host, user, pass string) (map[string]string, error) {
 func parseSystemInfo(output string) map[string]string {
 	// Dividir la salida en líneas
 	lines := splitLines(output)
-	
+
 	// Verificar que haya suficientes líneas (cabecera + datos)
 	if len(lines) < 2 {
 		return make(map[string]string)
@@ -206,13 +206,13 @@ func parseSystemInfo(output string) map[string]string {
 
 	// Extraer la cabecera (primera línea)
 	headers := splitFields(lines[0], ":")
-	
+
 	// Extraer los valores (segunda línea)
 	values := splitFields(lines[1], ":")
-	
+
 	// Crear el mapa de información
 	info := make(map[string]string)
-	
+
 	// Emparejar cabeceras con valores
 	for i, header := range headers {
 		header = trimSpaces(header)
@@ -234,10 +234,10 @@ func splitLines(text string) []string {
 	text = replaceAll(text, "\r\n", "\n")
 	// Reemplazar \r con \n por si acaso
 	text = replaceAll(text, "\r", "\n")
-	
+
 	// Dividir por \n
 	lines := split(text, "\n")
-	
+
 	// Filtrar líneas vacías al principio y al final
 	for len(lines) > 0 && lines[0] == "" {
 		lines = lines[1:]
@@ -245,7 +245,7 @@ func splitLines(text string) []string {
 	for len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
-	
+
 	return lines
 }
 
@@ -266,13 +266,13 @@ func trimSpaces(s string) string {
 	for start < len(s) && isSpace(s[start]) {
 		start++
 	}
-	
+
 	// Recorrer la cadena desde el final para encontrar el último carácter que no sea espacio
 	end := len(s)
 	for end > start && isSpace(s[end-1]) {
 		end--
 	}
-	
+
 	// Retornar la subcadena sin espacios
 	return s[start:end]
 }
@@ -292,7 +292,7 @@ func isSpace(c byte) bool {
 func split(text, delimiter string) []string {
 	var result []string
 	delimiterLen := len(delimiter)
-	
+
 	if delimiterLen == 0 {
 		// Si el delimitador es vacío, devolver cada caracter como un elemento
 		for i := 0; i < len(text); i++ {
@@ -300,7 +300,7 @@ func split(text, delimiter string) []string {
 		}
 		return result
 	}
-	
+
 	start := 0
 	for i := 0; i <= len(text)-delimiterLen; i++ {
 		if text[i:i+delimiterLen] == delimiter {
@@ -309,7 +309,7 @@ func split(text, delimiter string) []string {
 			start = i + 1
 		}
 	}
-	
+
 	// Agregar la última parte
 	result = append(result, text[start:])
 	return result
@@ -324,7 +324,7 @@ func replaceAll(s, old, new string) string {
 	if old == "" {
 		return s
 	}
-	
+
 	// Contar cuántas veces aparece old
 	count := 0
 	oldLen := len(old)
@@ -334,16 +334,16 @@ func replaceAll(s, old, new string) string {
 			i += oldLen - 1
 		}
 	}
-	
+
 	if count == 0 {
 		return s
 	}
-	
+
 	// Crear la nueva cadena
 	newLen := len(new)
 	resultLen := len(s) + count*(newLen-oldLen)
 	result := make([]byte, resultLen)
-	
+
 	j := 0
 	start := 0
 	for i := 0; i <= len(s)-oldLen; i++ {
@@ -362,6 +362,6 @@ func replaceAll(s, old, new string) string {
 	}
 	// Copiar la parte final
 	copy(result[j:], s[start:])
-	
+
 	return string(result[:j+len(s)-start])
 }
