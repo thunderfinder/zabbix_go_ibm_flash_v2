@@ -989,3 +989,444 @@ go build -o flashsystem_collector .
 ```
 
 **Importante:** El nombre del módulo **no afecta** la funcionalidad del programa. Solo debe ser consistente en todo el proyecto. Puedes usar cualquiera de los dos nombres, pero **debe coincidir entre `go.mod` y todos los imports**.
+
+
+
+
+# Funcionamiento Sin el Script Wrapper `flashsystem_collector.sh`
+
+## Opción 1: Ejecución Directa del Binario Go (Recomendada)
+
+Puedes usar el binario compilado directamente sin el script wrapper. Esta es una configuración válida y más simple.
+
+### Configuración en Zabbix Server
+
+**1. Editar `zabbix_server.conf`:**
+
+```bash
+sudo vi /etc/zabbix/zabbix_server.conf
+```
+
+**2. Configurar ExternalScripts:**
+
+```ini
+ExternalScripts=/usr/lib/zabbix/externalscripts
+```
+
+**3. Copiar el binario al directorio de scripts:**
+
+```bash
+sudo cp flashsystem_collector /usr/lib/zabbix/externalscripts/
+sudo chown zabbix:zabbix /usr/lib/zabbix/externalscripts/flashsystem_collector
+sudo chmod 750 /usr/lib/zabbix/externalscripts/flashsystem_collector
+```
+
+**4. Reiniciar Zabbix Server:**
+
+```bash
+sudo systemctl restart zabbix-server
+```
+
+---
+
+## Opción 2: UserParameter en Zabbix Agent
+
+Si usas Zabbix Agent en lugar de External Check:
+
+**1. Crear archivo de configuración:**
+
+```bash
+sudo tee /etc/zabbix/zabbix_agentd.d/flashsystem.conf << 'EOF'
+# Discovery de componentes
+UserParameter=flashsystem.discovery.drives[*],/usr/local/bin/flashsystem_collector $1 $2 $3 discoverdrives
+UserParameter=flashsystem.discovery.pools[*],/usr/local/bin/flashsystem_collector $1 $2 $3 discoverpools
+
+# Métricas de estado
+UserParameter=flashsystem.drive.status[*],/usr/local/bin/flashsystem_collector $1 $2 $3 getdrivestatus $4 $5
+UserParameter=flashsystem.pool.usage[*],/usr/local/bin/flashsystem_collector $1 $2 $3 getpoolusage $4
+UserParameter=flashsystem.system.iops[*],/usr/local/bin/flashsystem_collector $1 $2 $3 getiops
+EOF
+```
+
+**2. Reiniciar Zabbix Agent:**
+
+```bash
+sudo systemctl restart zabbix-agent
+```
+
+---
+
+## Comparación: Con vs Sin Wrapper
+
+| Característica | Con Wrapper (`.sh`) | Sin Wrapper (Binario Directo) |
+|---------------|---------------------|-------------------------------|
+| **Logging** | Automático a `/var/log/zabbix/flashsystem_collector.log` | Debes implementar logging en el binario Go |
+| **Timeout** | Manejado por el script (60s) | Depende de configuración de Zabbix |
+| **Validación** | Verifica existencia del binario | Zabbix valida directamente |
+| **Complejidad** | Mayor (2 archivos) | Menor (1 archivo) |
+| **Flexibilidad** | Alta (puede agregar lógica bash) | Limitada a lo que hace Go |
+| **Rendimiento** | Mínimo overhead por bash | Directo, sin overhead |
+| **Mantenimiento** | 2 archivos que mantener | 1 archivo que mantener |
+
+---
+
+## Configuración de Items en Zabbix (Sin Wrapper)
+
+### Item de Ejemplo: IOPS del Sistema
+
+| Campo | Valor |
+|-------|-------|
+| **Tipo** | External check |
+| **Clave** | `flashsystem_collector[{HOST.IP},monitor,contraseña,getiops]` |
+| **Tipo de información** | Numérico (entero sin signo) |
+| **Intervalo** | 60s |
+
+### Item de Ejemplo: Discovery de Discos
+
+| Campo | Valor |
+|-------|-------|
+| **Tipo** | External check |
+| **Clave** | `flashsystem_collector[{HOST.IP},monitor,contraseña,discoverdrives]` |
+| **Tipo de información** | Texto |
+| **Intervalo** | 3600s |
+
+---
+
+## Consideraciones de Seguridad
+
+### Sin Wrapper - Riesgos y Mitigaciones
+
+| Riesgo | Mitigación |
+|--------|------------|
+| **Credenciales en línea de comandos** | Usar macros cifradas en Zabbix (`{$FS_PASSWORD}`) |
+| **Logging limitado** | Implementar logging en `main.go` usando `log` package |
+| **Sin validación de entorno** | Verificar permisos en instalación |
+| **SELinux puede bloquear** | Configurar contexto `zabbix_script_t` |
+
+### Configurar SELinux (RHEL):
+
+```bash
+# Permitir ejecución de scripts externos
+sudo semanage fcontext -a -t zabbix_script_t "/usr/lib/zabbix/externalscripts/flashsystem_collector"
+sudo restorecon -v /usr/lib/zabbix/externalscripts/flashsystem_collector
+
+# Permitir conexiones de red desde Zabbix
+sudo setsebool -P zabbix_can_network on
+```
+
+---
+
+## Implementación de Logging en el Binario (Sin Wrapper)
+
+Si eliminas el wrapper, debes agregar logging en `main.go`:
+
+```go
+// En main.go, agregar al inicio de main()
+func init() {
+    // Configurar logging a archivo
+    logFile, err := os.OpenFile("/var/log/zabbix/flashsystem_collector.log", 
+        os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+    if err == nil {
+        log.SetOutput(logFile)
+    } else {
+        log.SetOutput(os.Stderr)
+    }
+    log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+}
+```
+
+**Permisos del archivo de log:**
+
+```bash
+sudo touch /var/log/zabbix/flashsystem_collector.log
+sudo chown zabbix:zabbix /var/log/zabbix/flashsystem_collector.log
+sudo chmod 640 /var/log/zabbix/flashsystem_collector.log
+```
+
+---
+
+## Flujo de Ejecución (Sin Wrapper)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         ZABBIX SERVER                           │
+│                                                                 │
+│  ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐   │
+│  │   Poller    │───>│ External     │───>│ flashsystem_    │   │
+│  │   Process   │    │ Check        │    │ collector       │   │
+│  │             │    │ (directo)    │    │ (binario Go)    │   │
+│  └─────────────┘    └──────────────┘    └─────────────────┘   │
+│                                                │                │
+│                                                ▼                │
+│                                         ┌─────────────┐        │
+│                                         │ SSH a       │        │
+│                                         │ FlashSystem │        │
+│                                         └─────────────┘        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Ventajas de Eliminar el Wrapper
+
+| Ventaja | Descripción |
+|---------|-------------|
+| **Simplicidad** | Un solo archivo que desplegar |
+| **Menos puntos de falla** | Sin script intermedio que pueda fallar |
+| **Más rápido** | Sin overhead de shell bash |
+| **Más portable** | El binario Go es autocontenido |
+| **Fácil compilación** | Solo `go build` para actualizar |
+
+---
+
+## Desventajas de Eliminar el Wrapper
+
+| Desventaja | Descripción |
+|------------|-------------|
+| **Logging manual** | Debes implementar en Go |
+| **Menos flexibilidad** | Cambios requieren recompilar |
+| **Sin pre-validación** | El wrapper validaba antes de ejecutar |
+| **Timeout de Zabbix** | Depende de configuración global |
+
+---
+
+## Recomendación Final
+
+**Para producción, recomiendo USAR el binario directo SIN wrapper** si:
+
+- ✅ Tu equipo tiene experiencia con Go
+- ✅ Implementas logging adecuado en el binario
+- ✅ Usas macros cifradas para credenciales en Zabbix
+- ✅ Configuras correctamente permisos y SELinux
+
+**Mantén el wrapper si:**
+
+- ✅ Necesitas logging robusto sin modificar Go
+- ✅ Quieres validación adicional antes de ejecutar
+- ✅ Prefieres flexibilidad de script bash para cambios rápidos
+
+---
+
+## Comandos de Verificación (Sin Wrapper)
+
+```bash
+# Verificar que Zabbix puede ejecutar el binario
+sudo -u zabbix /usr/lib/zabbix/externalscripts/flashsystem_collector 10.10.10.50 monitor contraseña getiops
+
+# Verificar logs
+tail -f /var/log/zabbix/flashsystem_collector.log
+
+# Verificar procesos Zabbix
+ps aux | grep zabbix | grep flashsystem
+
+# Probar desde Zabbix Server
+zabbix_get -s <zabbix_server_ip> -k "flashsystem_collector[10.10.10.50,monitor,contraseña,getiops]"
+```
+
+---
+
+## Conclusión
+
+Eliminar el script wrapper **es completamente viable** y de hecho **simplifica la arquitectura**. El binario Go ya tiene toda la lógica necesaria para:
+
+1. Conectarse por SSH al FlashSystem
+2. Ejecutar comandos `svcinfo`
+3. Parsear la salida
+4. Retornar métricas en formato Zabbix
+
+El wrapper era principalmente para logging y validación adicional, pero ambas funciones pueden implementarse directamente en el código Go o manejarse mediante la configuración de Zabbix.
+
+
+# Explicación Detallada de UserParameter
+
+## Línea Completa
+
+```bash
+UserParameter=flashsystem.discovery.drives[*],/usr/lib/zabbix/externalscripts/flashsystem_collector.sh $1 $2 $3 discoverdrives
+```
+
+---
+
+## Desglose Item por Item
+
+| Segmento | Valor | Explicación |
+|----------|-------|-------------|
+| **1** | `UserParameter=` | **Directiva de configuración** de Zabbix Agent. Indica que se está definiendo un parámetro personalizado que el agente puede ejecutar cuando Zabbix Server lo solicite. |
+| **2** | `flashsystem.discovery.drives[*]` | **Clave del item (key)**. Es el nombre único que se usará en Zabbix Frontend para crear items. |
+| **3** | `[*]` | **Parámetros variables**. Los asteriscos entre corchetes indican que esta clave acepta parámetros variables que se pasarán al script. Cada `*` representa un parámetro que puede cambiar. |
+| **4** | `,` | **Separador**. Divide la clave del comando que se ejecutará. |
+| **5** | `/usr/lib/zabbix/externalscripts/flashsystem_collector.sh` | **Ruta al script ejecutable**. Es el script wrapper que Zabbix ejecutará cuando se solicite esta clave. Debe tener permisos de ejecución. |
+| **6** | `$1` | **Primer parámetro variable**. Se reemplaza con el primer argumento pasado desde Zabbix Server (generalmente la IP del FlashSystem). |
+| **7** | `$2` | **Segundo parámetro variable**. Se reemplaza con el segundo argumento (generalmente el usuario SSH). |
+| **8** | `$3` | **Tercer parámetro variable**. Se reemplaza con el tercer argumento (generalmente la contraseña SSH). |
+| **9** | `discoverdrives` | **Comando fijo**. Este parámetro NO es variable. Siempre se pasa literalmente al script, indicando que la acción a realizar es el descubrimiento de unidades. |
+
+---
+
+## Flujo de Ejecución
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         ZABBIX SERVER                                   │
+│                                                                         │
+│  Solicita: flashsystem.discovery.drives[10.10.10.50,monitor,pass]      │
+│                            ↓                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         ZABBIX AGENT                                    │
+│                                                                         │
+│  Lee UserParameter en zabbix_agentd.conf                               │
+│                            ↓                                            │
+│  Reemplaza parámetros:                                                 │
+│  $1 → 10.10.10.50                                                      │
+│  $2 → monitor                                                          │
+│  $3 → pass                                                             │
+│                            ↓                                            │
+│  Ejecuta: /usr/lib/zabbix/externalscripts/flashsystem_collector.sh     │
+│           10.10.10.50 monitor pass discoverdrives                      │
+│                            ↓                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      SCRIPT WRAPPER (bash)                              │
+│                                                                         │
+│  Valida argumentos → Llama al binario Go → Captura salida              │
+│                            ↓                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      BINARIO GO (flashsystem_collector)                 │
+│                                                                         │
+│  1. Conecta por SSH a 10.10.10.50                                      │
+│  2. Ejecuta: svcinfo lsdrive -delim :                                  │
+│  3. Parsea la salida                                                   │
+│  4. Genera JSON para LLD                                               │
+│                            ↓                                            │
+│  Retorna: {"data":[{"{#DRIVEID}":"1","{#ENCLOSUREID}":"0",...}]}      │
+└─────────────────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         ZABBIX SERVER                                   │
+│                                                                         │
+│  Recibe JSON → Procesa regla LLD → Crea items por cada unidad          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Ejemplos de Uso en Zabbix Frontend
+
+### Configuración del Item en Zabbix
+
+| Campo | Valor |
+|-------|-------|
+| **Nombre** | IBM FlashSystem: Descubrimiento de Unidades |
+| **Tipo** | Zabbix agent (o Zabbix agent 2) |
+| **Clave** | `flashsystem.discovery.drives[{HOST.IP},{$FS_USER},{$FS_PASSWORD}]` |
+| **Tipo de información** | Texto |
+| **Intervalo de actualización** | 3600s (1 hora) |
+
+### Macros Utilizadas
+
+| Macro | Valor de Ejemplo | Propósito |
+|-------|-----------------|-----------|
+| `{$FS_USER}` | monitor | Usuario SSH para el storage |
+| `{$FS_PASSWORD}` | contraseña123 | Contraseña del usuario |
+| `{HOST.IP}` | 10.10.10.50 | IP del host monitoreado (se resuelve automáticamente) |
+
+---
+
+## Qué Devuelve Este UserParameter
+
+### Salida JSON Esperada (Low-Level Discovery)
+
+```json
+{
+  "data": [
+    {
+      "{#DRIVEID}": "1",
+      "{#ENCLOSUREID}": "0",
+      "{#SLOTID}": "12",
+      "{#DRIVESTATUS}": "online"
+    },
+    {
+      "{#DRIVEID}": "2",
+      "{#ENCLOSUREID}": "0",
+      "{#SLOTID}": "13",
+      "{#DRIVESTATUS}": "online"
+    },
+    {
+      "{#DRIVEID}": "3",
+      "{#ENCLOSUREID}": "1",
+      "{#SLOTID}": "5",
+      "{#DRIVESTATUS}": "offline"
+    }
+  ]
+}
+```
+
+### Qué Hace Zabbix con Esta Salida
+
+1. **Recibe el JSON** del script
+2. **Itera sobre cada elemento** en el array `data`
+3. **Crea un item prototipo** por cada unidad descubierta
+4. **Sustituye las macros** `{#DRIVEID}`, `{#ENCLOSUREID}`, etc. con los valores reales
+5. **Monitorea cada unidad** individualmente según los prototipos configurados
+
+---
+
+## Prototipos de Item que se Pueden Crear
+
+Con este discovery, puedes crear prototipos como:
+
+| Prototipo | Clave del Item | Tipo | Intervalo |
+|-----------|---------------|------|-----------|
+| Estado de unidad | `flashsystem.drive.status[{#ENCLOSUREID},{#SLOTID}]` | External check | 300s |
+| Nombre de unidad | `flashsystem.drive.name[{#DRIVEID}]` | Dependent item | - |
+| Tipo de unidad | `flashsystem.drive.type[{#DRIVEID}]` | Dependent item | - |
+
+---
+
+## Consideraciones de Seguridad
+
+| Aspecto | Recomendación |
+|---------|--------------|
+| **Contraseña en claro** | Usar vault de secretos o autenticación por claves SSH |
+| **Permisos del script** | `chmod 755` y propietario `zabbix:zabbix` |
+| **AllowKey en Agent** | Si está restringido, agregar: `AllowKey=system.run[*]` |
+| **SELinux** | Configurar contexto `zabbix_script_t` en RHEL |
+| **Logging** | Habilitar logs en `/var/log/zabbix/` para auditoría |
+
+---
+
+## Comandos de Verificación
+
+```bash
+# Verificar que el UserParameter está cargado
+grep flashsystem.discovery.drives /etc/zabbix/zabbix_agentd.d/*.conf
+
+# Probar la clave desde la línea de comandos
+zabbix_get -s localhost -k 'flashsystem.discovery.drives[10.10.10.50,monitor,pass]'
+
+# Verificar permisos del script
+ls -l /usr/lib/zabbix/externalscripts/flashsystem_collector.sh
+
+# Verificar logs del agente
+tail -f /var/log/zabbix/zabbix_agentd.log | grep flashsystem
+```
+
+---
+
+## Resumen
+
+| Componente | Función |
+|------------|---------|
+| `UserParameter=` | Define un comando personalizado para Zabbix Agent |
+| `flashsystem.discovery.drives[*]` | Clave única que identifica este monitoreo |
+| `[*]` | Permite pasar parámetros variables desde Zabbix Server |
+| `$1 $2 $3` | Reciben los parámetros (IP, usuario, contraseña) |
+| `discoverdrives` | Comando fijo que indica qué acción ejecutar |
+| **Resultado** | JSON para descubrimiento automático de unidades en Zabbix LLD |
+
+Esta línea es **fundamental** para habilitar el descubrimiento automático de unidades de disco IBM FlashSystem en Zabbix, permitiendo monitoreo dinámico sin configuración manual de cada disco.
